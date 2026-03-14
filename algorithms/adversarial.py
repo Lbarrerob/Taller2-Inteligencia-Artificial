@@ -49,6 +49,36 @@ class MinimaxAgent(MultiAgentSearchAgent):
     """
     Minimax agent for the drone (MAX) vs hunters (MIN) game.
     """
+    def minimax(self, state, agent_index, max_depth, num_agents):
+        
+        if state.is_win() or state.is_lose() or max_depth==0:
+            return self.evaluation_function(state)
+
+        next_agent = (agent_index+1)%num_agents
+        
+        if next_agent == 0:
+            max_depth -= 1
+
+        if agent_index == 0:
+            value = float('-inf')
+
+            for action in state.get_legal_actions(agent_index):
+                successor = state.generate_successor(agent_index, action)
+                
+                value = max(value, self.minimax(self, successor, next_agent, max_depth, num_agents))
+            
+            return value
+
+        else:
+            value = float('inf')
+
+            for action in state.get_legal_actions(agent_index):
+                successor = state.generate_successor(agent_index, action)
+                
+                value = min(value, self.minimax(self, successor, next_agent, max_depth, num_agents))
+            
+            return value
+
 
     def get_action(self, state: GameState) -> Directions | None:
         """
@@ -65,8 +95,21 @@ class MinimaxAgent(MultiAgentSearchAgent):
         - The next agent is (agent_index + 1) % num_agents. Depth decreases after all agents have moved (full ply).
         - Return the ACTION (not the value) that maximizes the minimax value for the drone.
         """
-        # TODO: Implement your code here
-        return None
+        num_agents = state.get_num_agents()
+
+        best_action = None
+        best_value = float('-inf')
+
+        for action in state.get_legal_actions(0):
+            succesor = state.generate_successor(0, action)
+
+            value = self.minimax(self, succesor, 1, self.depth, num_agents)
+
+            if value>best_value:
+                best_value=value
+                best_action=action
+
+        return best_action
 
 
 class AlphaBetaAgent(MultiAgentSearchAgent):

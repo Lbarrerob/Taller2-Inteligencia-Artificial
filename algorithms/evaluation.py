@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from algorithms.utils import dijkstra, bfs_distance
+
 
 if TYPE_CHECKING:
     from world.game_state import GameState
@@ -41,5 +43,34 @@ def evaluation_function(state: GameState) -> float:
     - Consider edge cases: no pending deliveries, no hunters nearby.
     - A good evaluation function balances delivery progress with hunter avoidance.
     """
-    # TODO: Implement your code here
+    if state.is_win():
+        return 1000
+    
+    if state.is_lose():
+        return -1000
+    
+    pos_drone = state.get_drone_position()
+    pos_hunters = state.get_hunter_positions()
+    deliveries = state.get_pending_deliveries()
+
+    layout = state.get_layout()
+    score = state.get_score()
+
+    value = 0
+
+    #(a) BFS distance from drone to nearest delivery point (closer is better).
+    # Uses actual path distance so walls and terrain are respected.'''
+    if len(deliveries):
+        
+        dist_delivery = float('inf')
+        for d in deliveries:
+            if dijkstra(layout, pos_drone, d)[0]<dist_delivery:
+                dist_delivery = dijkstra(layout, pos_drone, d)[0]
+        
+        value -=5 *dist_delivery 
+
+    #(b) BFS distance from each hunter to the drone, traversing only normal terrain ('.' / ' ').  
+    # Hunters blocked by mountains, fog, or storms are treated as unreachable (distance = inf) and pose no threat.]
+
+    
     return 0.0
