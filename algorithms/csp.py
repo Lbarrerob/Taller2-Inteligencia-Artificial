@@ -24,8 +24,35 @@ def backtracking_search(csp: DroneAssignmentCSP) -> dict[str, str] | None:
     You can find inspiration in the textbook's pseudocode:
     Artificial Intelligence: A Modern Approach (4th Edition) by Russell and Norvig, Chapter 5: Constraint Satisfaction Problems
     """
-    # TODO: Implement your code here
-    return None
+    def backtrack(assignment: dict[str, str]) -> dict[str, str] | None:
+        # Si la asignación está completa, retornar la solución
+        if csp.is_complete(assignment):
+            return assignment
+        
+        # Seleccionar una variable no asignada
+        unassigned = csp.get_unassigned_variables(assignment)
+        if not unassigned:
+            return None
+        var = unassigned[0]
+        
+        # Probar cada valor en el dominio de la variable
+        for value in csp.domains[var]:
+            # Verificar si la asignación es consistente
+            if csp.is_consistent(var, value, assignment):
+                # Asignar el valor
+                csp.assign(var, value, assignment)
+                
+                # Recursión
+                result = backtrack(assignment)
+                if result is not None:
+                    return result
+                
+                # Backtrack: deshacer la asignación
+                csp.unassign(var, assignment)
+        
+        return None
+    
+    return backtrack({})
 
 
 def backtracking_fc(csp: DroneAssignmentCSP) -> dict[str, str] | None:
@@ -40,8 +67,74 @@ def backtracking_fc(csp: DroneAssignmentCSP) -> dict[str, str] | None:
     - Use csp.is_consistent(neighbor, val, assignment) to check if a value is still consistent.
     - Forward checking reduces the search space by detecting failures earlier than basic backtracking.
     """
-    # TODO: Implement your code here
-    return None
+    def forward_check(var: str, value: str, assignment: dict[str, str]) -> dict[str, list[str]] | None:
+        """
+        Realiza forward checking después de asignar var=value.
+        Retorna un diccionario con los valores eliminados de cada dominio,
+        o None si algún dominio queda vacío.
+        """
+        removed: dict[str, list[str]] = {}
+        
+        # Para cada vecino no asignado
+        for neighbor in csp.get_neighbors(var):
+            if neighbor in assignment:
+                continue
+            
+            removed[neighbor] = []
+            # Verificar cada valor en el dominio del vecino
+            for val in list(csp.domains[neighbor]):
+                # Si el valor no es consistente con la asignación actual
+                if not csp.is_consistent(neighbor, val, assignment):
+                    csp.domains[neighbor].remove(val)
+                    removed[neighbor].append(val)
+            
+            # Si el dominio queda vacío, falla
+            if not csp.domains[neighbor]:
+                return None
+        
+        return removed
+    
+    def restore_domains(removed: dict[str, list[str]]) -> None:
+        """Restaura los valores eliminados a los dominios."""
+        for var, values in removed.items():
+            csp.domains[var].extend(values)
+    
+    def backtrack(assignment: dict[str, str]) -> dict[str, str] | None:
+        # Si la asignación está completa, retornar la solución
+        if csp.is_complete(assignment):
+            return assignment
+        
+        # Seleccionar una variable no asignada
+        unassigned = csp.get_unassigned_variables(assignment)
+        if not unassigned:
+            return None
+        var = unassigned[0]
+        
+        # Probar cada valor en el dominio de la variable
+        for value in list(csp.domains[var]):
+            # Verificar si la asignación es consistente
+            if csp.is_consistent(var, value, assignment):
+                # Asignar el valor
+                csp.assign(var, value, assignment)
+                
+                # Forward checking
+                removed = forward_check(var, value, assignment)
+                
+                if removed is not None:
+                    # Recursión
+                    result = backtrack(assignment)
+                    if result is not None:
+                        return result
+                    
+                    # Restaurar dominios
+                    restore_domains(removed)
+                
+                # Backtrack: deshacer la asignación
+                csp.unassign(var, assignment)
+        
+        return None
+    
+    return backtrack({})
 
 
 def backtracking_ac3(csp: DroneAssignmentCSP) -> dict[str, str] | None:
@@ -60,8 +153,134 @@ def backtracking_ac3(csp: DroneAssignmentCSP) -> dict[str, str] | None:
       - an ac3 function that manages the queue of arcs to check and calls revise.
       - a backtrack function that integrates AC-3 into the search process.
     """
-    # TODO: Implement your code here
-    return None
+    def values_compatible(xi: str, vi: str, xj: str, vj: str, assignment: dict[str, str]) -> bool:
+        """
+        Verifica si dos pares variable-valor son compatibles con las restricciones.
+        """
+        # Crear una asignación temporal con ambos valores
+        temp_assignment = dict(assignment)
+        temp_assignment[xi] = vi
+        temp_assignment[xj] = vj
+        
+        # Verificar si ambas asignaciones son consistentes
+        return csp.is_consistent(xi, vi, {xj: vj}) and csp.is_consistent(xj, vj, {xi: vi})
+    
+    def revise(xi: str, xj: str, assignment: dict[str, str]) -> bool:
+        """
+        Elimina valores del dominio de xi que no tienen soporte en el dominio de xj.
+        Retorna True si se eliminó algún valor.
+        """
+        revised = False
+        values_to_remove = []
+        
+        for vi in csp.domains[xi]:
+            # Verificar si existe al menos un valor en el dominio de xj que sea compatible
+            has_support = False
+            for vj in csp.domains[xj]:
+                if values_compatible(xi, vi, xj, vj, assignment):
+                    has_support = True
+                    break
+            
+            # Si no hay soporte, marcar para eliminar
+            if not has_support:
+                values_to_remove.append(vi)
+                revised = True
+        
+        # Eliminar valores sin soporte
+        for val in values_to_remove:
+            csp.domains[xi].remove(val)
+        
+        return revised
+    
+    def ac3(assignment: dict[str, str], arcs: list[tuple[str, str]] | None = None) -> bool:
+        """
+        Algoritmo AC-3 para mantener consistencia de arco.
+        Retorna False si algún dominio queda vacío.
+        """
+        # Si no se especifican arcos, usar todos los arcos
+        if arcs is None:
+            queue = []
+            for xi in csp.variables:
+                if xi not in assignment:
+                    for xj in csp.get_neighbors(xi):
+                        if xj not in assignment:
+                            queue.append((xi, xj))
+        else:
+            queue = list(arcs)
+        
+        while queue:
+            xi, xj = queue.pop(0)
+            
+            # Si alguna variable ya está asignada, saltar
+            if xi in assignment or xj in assignment:
+                continue
+            
+            if revise(xi, xj, assignment):
+                # Si el dominio de xi queda vacío, falla
+                if not csp.domains[xi]:
+                    return False
+                
+                # Agregar arcos (xk, xi) para todos los vecinos xk de xi (excepto xj)
+                for xk in csp.get_neighbors(xi):
+                    if xk != xj and xk not in assignment:
+                        queue.append((xk, xi))
+        
+        return True
+    
+    def backtrack(assignment: dict[str, str]) -> dict[str, str] | None:
+        # Si la asignación está completa, retornar la solución
+        if csp.is_complete(assignment):
+            return assignment
+        
+        # Seleccionar una variable no asignada
+        unassigned = csp.get_unassigned_variables(assignment)
+        if not unassigned:
+            return None
+        var = unassigned[0]
+        
+        # Probar cada valor en el dominio de la variable
+        for value in list(csp.domains[var]):
+            # Verificar si la asignación es consistente
+            if csp.is_consistent(var, value, assignment):
+                # Guardar dominios actuales
+                saved_domains = {v: list(csp.domains[v]) for v in csp.variables}
+                
+                # Asignar el valor
+                csp.assign(var, value, assignment)
+                
+                # Crear arcos para AC-3: todos los arcos (neighbor, var_neighbor)
+                arcs = []
+                for neighbor in csp.get_neighbors(var):
+                    if neighbor not in assignment:
+                        for other in csp.get_neighbors(neighbor):
+                            if other not in assignment:
+                                arcs.append((neighbor, other))
+                
+                # Ejecutar AC-3
+                if ac3(assignment, arcs):
+                    # Recursión
+                    result = backtrack(assignment)
+                    if result is not None:
+                        return result
+                
+                # Backtrack: restaurar dominios y deshacer asignación
+                csp.domains = saved_domains
+                csp.unassign(var, assignment)
+        
+        return None
+    
+    # Ejecutar AC-3 inicial para reducir dominios globalmente
+    saved_domains = {v: list(csp.domains[v]) for v in csp.variables}
+    if not ac3({}):
+        return None
+    
+    result = backtrack({})
+    
+    # Si no hay solución, restaurar dominios originales
+    if result is None:
+        csp.domains = saved_domains
+    
+    return result
 
 
 def backtracking_mrv_lcv(csp: DroneAssignmentCSP) -> dict[str, str] | None:
