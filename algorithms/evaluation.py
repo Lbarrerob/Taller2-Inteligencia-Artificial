@@ -8,6 +8,7 @@ from algorithms.utils import dijkstra, bfs_distance
 if TYPE_CHECKING:
     from world.game_state import GameState
 
+pos_visited = set()
 
 def evaluation_function(state: GameState) -> float:
     """
@@ -71,6 +72,52 @@ def evaluation_function(state: GameState) -> float:
 
     #(b) BFS distance from each hunter to the drone, traversing only normal terrain ('.' / ' ').  
     # Hunters blocked by mountains, fog, or storms are treated as unreachable (distance = inf) and pose no threat.]
+    min_hunter = float('inf')
+    for hunter in pos_hunters:
+        dist_hunter = bfs_distance(layout, hunter, pos_drone, True)
 
+        if dist_hunter == 0:
+            return -1000
+        if dist_hunter < min_hunter:
+            min_hunter = dist_hunter
+        if dist_hunter != float('inf'):
+            value +=3 *dist_hunter
     
-    return 0.0
+    #(c) BFS distance to a "safe" position (i.e., a position that is not in the path of any hunter).
+    if min_hunter != float('inf'):
+        value +=5 *min_hunter
+
+    #(d) Number of pending deliveries (fewer is better).
+    value -=25 *len(deliveries)
+
+    #(e) Current score (higher is better).
+    value +=8 *score
+
+    #(f) Delivery urgency: reward the drone for being close to a delivery it can reach strictly before 
+    # any hunter, so it commits to nearby pickups rather than oscillating in place out of excessive hunter fear.     
+    for delivery in deliveries:
+        dist_drone = dijkstra(layout, pos_drone, delivery)[0]
+
+        dist_hunters = []
+        for hunter in pos_hunters:
+            d_hunter = bfs_distance(layout, hunter, delivery, True)
+            dist_hunters.append(d_hunter)
+        
+        if dist_drone < min(dist_hunters):
+            value +=20
+  
+    #(g) Adding a revisit penalty can help prevent the drone from getting stuck in cycles.
+    if pos_drone in pos_visited:
+        value -=5
+
+    pos_visited.add(pos_drone)
+
+
+    value -=1
+    #para asegurar value en rango (-1000, 1000)
+    if value < -1000:
+        value = -1000
+    if value > 1000:
+        value = 1000
+
+    return value

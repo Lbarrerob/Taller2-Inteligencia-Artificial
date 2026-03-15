@@ -65,7 +65,7 @@ class MinimaxAgent(MultiAgentSearchAgent):
             for action in state.get_legal_actions(agent_index):
                 successor = state.generate_successor(agent_index, action)
                 
-                value = max(value, self.minimax(self, successor, next_agent, max_depth, num_agents))
+                value = max(value, self.minimax(successor, next_agent, max_depth, num_agents))
             
             return value
 
@@ -75,7 +75,7 @@ class MinimaxAgent(MultiAgentSearchAgent):
             for action in state.get_legal_actions(agent_index):
                 successor = state.generate_successor(agent_index, action)
                 
-                value = min(value, self.minimax(self, successor, next_agent, max_depth, num_agents))
+                value = min(value, self.minimax(successor, next_agent, max_depth, num_agents))
             
             return value
 
@@ -103,7 +103,7 @@ class MinimaxAgent(MultiAgentSearchAgent):
         for action in state.get_legal_actions(0):
             succesor = state.generate_successor(0, action)
 
-            value = self.minimax(self, succesor, 1, self.depth, num_agents)
+            value = self.minimax(succesor, 1, self.depth, num_agents)
 
             if value>best_value:
                 best_value=value
