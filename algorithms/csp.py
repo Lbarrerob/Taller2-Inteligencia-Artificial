@@ -295,5 +295,69 @@ def backtracking_mrv_lcv(csp: DroneAssignmentCSP) -> dict[str, str] | None:
       values that rule out the fewest choices for neighboring variables.
     - Use csp.get_num_conflicts(var, value, assignment) to count how many values would be ruled out for neighbors if var=value is assigned.
     """
-    # TODO: Implement your code here (BONUS)
-    return None
+    def forward_check(var: str, assignment: dict[str, str]) -> dict[str, list[str]] | None:
+        """
+        Realiza forward checking después de asignar var=value.
+        Retorna un diccionario con los valores eliminados de cada dominio,
+        o None si algún dominio queda vacío.
+        """
+        removed: dict[str, list[str]] = {}
+        
+        # Para cada vecino no asignado
+        for neighbor in csp.get_neighbors(var):
+            if neighbor in assignment:
+                continue
+            
+            removed[neighbor] = []
+            # Verificar cada valor en el dominio del vecino
+            for val in list(csp.domains[neighbor]):
+                # Si el valor no es consistente con la asignación actual
+                if not csp.is_consistent(neighbor, val, assignment):
+                    csp.domains[neighbor].remove(val)
+                    removed[neighbor].append(val)
+            
+            # Si el dominio queda vacío, falla
+            if not csp.domains[neighbor]:
+                return None
+        
+        return removed
+    
+    def restore_domains(removed: dict[str, list[str]]) -> None:
+        """Restaura los valores eliminados a los dominios."""
+        for var, values in removed.items():
+            csp.domains[var].extend(values)
+
+    def backtrack(assignment:dict[str, str])->dict [str,str]|None:
+        if csp.is_complete(assignment):
+            return assignment
+        var= min(
+            csp.get_unassigned_variables(assignment),
+            key= lambda vr: (
+                sum(1 for val in csp.domains[vr] if csp.is_consistent(vr, val, assignment)),
+                -sum(1 for n in csp.get_neighbors(vr) if n not in assignment)
+            )
+        )
+
+
+        ordenados = sorted(
+            csp.domains[var], 
+            key= lambda val: csp.get_num_conflicts(var, val, assignment)
+        )
+        for valor in ordenados:
+            if not csp.is_consistent(var, valor, assignment):
+                continue
+            csp.assign(var, valor, assignment)
+
+            eliminar = forward_check(var, assignment)
+
+            if eliminar is not None:
+                resultado = backtrack(assignment)
+                if resultado is not None:
+                    return resultado
+                restore_domains(eliminar)
+
+            csp.unassign(var, assignment)
+
+        return None
+     
+    return backtrack({})
