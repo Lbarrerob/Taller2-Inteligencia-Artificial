@@ -327,6 +327,7 @@ def backtracking_mrv_lcv(csp: DroneAssignmentCSP) -> dict[str, str] | None:
         for var, values in removed.items():
             csp.domains[var].extend(values)
 
+    stats = {"assignments": 1, "backtracks": 0}
     def backtrack(assignment:dict[str, str])->dict [str,str]|None:
         if csp.is_complete(assignment):
             return assignment
@@ -346,6 +347,7 @@ def backtracking_mrv_lcv(csp: DroneAssignmentCSP) -> dict[str, str] | None:
         for valor in ordenados:
             if not csp.is_consistent(var, valor, assignment):
                 continue
+            stats["assignments"] += 1
             csp.assign(var, valor, assignment)
 
             eliminar = forward_check(var, assignment)
@@ -355,9 +357,13 @@ def backtracking_mrv_lcv(csp: DroneAssignmentCSP) -> dict[str, str] | None:
                 if resultado is not None:
                     return resultado
                 restore_domains(eliminar)
-
+            stats["backtracks"] += 1
             csp.unassign(var, assignment)
 
         return None
-     
-    return backtrack({})
+    res= backtrack({})
+    #print(
+     #   f"[MRV+LCV] Asignaciones intentadas: {stats['assignments']} | "
+     #   f"Backtracks: {stats['backtracks']}"
+   # )  ## solo fue implementado para poder contar las asignaciones 
+    return res
